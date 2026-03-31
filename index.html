@@ -315,11 +315,15 @@
 
   /* ─── CLUSTERIC QUALITY FILTER ────────────────────── */
   .clusteric-filter-bar { display: flex; gap: 3px; background: var(--navy-deeper); border: 1px solid var(--border); border-radius: 4px; padding: 3px; margin-bottom: 10px; flex-wrap: wrap; }
-  .cftab { font-family: 'Inter', Arial, sans-serif; font-size: 10px; font-weight: 700; padding: 4px 12px; border-radius: 3px; cursor: pointer; border: none; background: transparent; color: var(--text3); text-transform: uppercase; letter-spacing: 0.4px; transition: all 0.14s; }
+  .cftab { font-family: 'Inter', Arial, sans-serif; font-size: 10px; font-weight: 700; padding: 4px 12px; border-radius: 3px; cursor: pointer; border: 1px solid transparent; background: transparent; color: var(--text3); text-transform: uppercase; letter-spacing: 0.4px; transition: all 0.14s; }
   .cftab:hover { color: var(--text2); }
   .cftab.active { background: var(--surface2); color: #9ecce8; box-shadow: 0 1px 4px rgba(0,0,0,0.3); }
-  .cftab.cftab-bad.active { color: var(--red); }
-  .cftab.cftab-avg.active { color: var(--orange); }
+  .cftab-bad { color: rgba(224,69,69,0.6); }
+  .cftab-bad:hover { color: var(--red); background: rgba(224,69,69,0.07); }
+  .cftab-bad.active { background: rgba(224,69,69,0.12); border-color: rgba(224,69,69,0.35); color: var(--red); box-shadow: 0 1px 6px rgba(224,69,69,0.15); }
+  .cftab-avg { color: rgba(224,128,69,0.6); }
+  .cftab-avg:hover { color: var(--orange); background: rgba(224,128,69,0.07); }
+  .cftab-avg.active { background: rgba(224,128,69,0.12); border-color: rgba(224,128,69,0.35); color: var(--orange); box-shadow: 0 1px 6px rgba(224,128,69,0.15); }
 
   /* ─── CLUSTERIC STATUS BADGES ─────────────────────── */
   .dcl-badge-bad { background: rgba(224,69,69,0.15); color: #f08080; border: 1px solid rgba(224,69,69,0.3); }
