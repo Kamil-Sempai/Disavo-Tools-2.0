@@ -1,4 +1,3 @@
-
 <!DOCTYPE html>
 <html lang="pl">
 <head>
@@ -311,6 +310,8 @@
   .tld-btn { font-family: 'Inter', Arial, sans-serif; font-size: 10px; font-weight: 700; padding: 3px 9px; border-radius: 3px; border: 1px solid var(--border2); background: var(--surface2); color: var(--text2); cursor: pointer; letter-spacing: 0.4px; transition: all 0.14s; }
   .tld-btn:hover { border-color: var(--green); color: var(--green); }
   .tld-btn.active { background: rgba(79,168,61,0.15); border-color: rgba(79,168,61,0.4); color: var(--green); }
+  .tld-btn-clear { color: var(--text3); border-style: dashed; margin-left: 4px; }
+  .tld-btn-clear:hover { border-color: var(--red); color: var(--red) !important; }
 
   /* ─── CLUSTERIC QUALITY FILTER ────────────────────── */
   .clusteric-filter-bar { display: flex; gap: 3px; background: var(--navy-deeper); border: 1px solid var(--border); border-radius: 4px; padding: 3px; margin-bottom: 10px; flex-wrap: wrap; }
@@ -844,9 +845,9 @@ let activeFilter='all', searchQuery='', running=false, stopFlag=false, startTime
 let blockADomains = []; // {entry, isUrl, checked}  entry = bare domain OR full URL
 let blockCDomains = []; // {domain, checked}
 let blockDDomains = []; // {entry, isUrl:false, checked, clusterStatus:'BAD'|'AVG'}
-let blockCTldFilter = 'all';
+let blockCTldFilter = new Set(); // pusty Set = brak filtra = pokazuj wszystkie
 let blockDQFilter   = 'all';
-let blockDTldFilter = 'all';
+let blockDTldFilter = new Set();
 
 /* ═══════════════════════════════════════════════════════
    HELPERS
@@ -866,27 +867,48 @@ function getTld(domain){
   return parts.length >= 2 ? '.'+parts[parts.length-1].toLowerCase() : '';
 }
 
-function buildTldFilter(domains, filterId, wrapId, onSelect){
-  const tlds = [...new Set(domains.map(d=>getTld(d.entry)).filter(Boolean))].sort();
+function buildTldFilter(domains, filterId, wrapId, onToggle){
+  const tlds = [...new Set(domains.map(d=>getTld(d.entry)).filter(Boolean))]
+    .sort((a,b)=>{
+      if(a==='.pl') return -1;
+      if(b==='.pl') return 1;
+      return a.localeCompare(b);
+    });
   const wrap  = document.getElementById(wrapId);
   const cont  = document.getElementById(filterId);
   if(tlds.length <= 1){ wrap.style.display='none'; return; }
-  wrap.style.display='';
+  wrap.style.display='block';
   cont.innerHTML='';
-  function makeBtn(label, value){
+
+  // Przycisk "Wyczyść filtry" — pojawia się tylko gdy coś zaznaczono
+  const clearBtn = document.createElement('button');
+  clearBtn.className = 'tld-btn tld-btn-clear';
+  clearBtn.textContent = '✕ Wyczyść';
+  clearBtn.style.display = 'none';
+  clearBtn.onclick = ()=>{
+    cont.querySelectorAll('.tld-btn[data-tld]').forEach(b=>b.classList.remove('active'));
+    clearBtn.style.display='none';
+    onToggle(new Set());
+  };
+
+  tlds.forEach(t=>{
+    const isPl = t==='.pl';
     const b = document.createElement('button');
-    b.className = 'tld-btn' + (value==='all'?' active':'');
-    b.textContent = label;
-    b.dataset.tld = value;
+    b.className = 'tld-btn';
+    b.textContent = t;
+    b.dataset.tld = t;
     b.onclick = ()=>{
-      cont.querySelectorAll('.tld-btn').forEach(x=>x.classList.remove('active'));
-      b.classList.add('active');
-      onSelect(value);
+      b.classList.toggle('active');
+      const active = new Set(
+        [...cont.querySelectorAll('.tld-btn[data-tld].active')].map(x=>x.dataset.tld)
+      );
+      clearBtn.style.display = active.size > 0 ? '' : 'none';
+      onToggle(active);
     };
-    return b;
-  }
-  cont.appendChild(makeBtn('Wszystkie TLD','all'));
-  tlds.forEach(t=> cont.appendChild(makeBtn(t, t)));
+    cont.appendChild(b);
+  });
+
+  cont.appendChild(clearBtn);
 }
 
 /* ─── Parse disavow/domain list ─────────────────────
@@ -1540,9 +1562,9 @@ async function loadAhrefsFile(file){
     document.getElementById('ahrefs-upload-area').style.display='none';
 
     blockCDomains=spamDomains.map(d=>({entry:d, isUrl:false, checked:true}));
-    blockCTldFilter='all';
-    buildTldFilter(blockCDomains,'blockC-tld-filter','blockC-tld-wrap', tld=>{
-      blockCTldFilter=tld; renderBlockC();
+    blockCTldFilter=new Set();
+    buildTldFilter(blockCDomains,'blockC-tld-filter','blockC-tld-wrap', active=>{
+      blockCTldFilter=active; renderBlockC();
     });
     renderBlockC();
     updatePreview();
@@ -1589,7 +1611,7 @@ function splitCSVLine(line,sep){
 
 function clearAhrefs(){
   blockCDomains=[];
-  blockCTldFilter='all';
+  blockCTldFilter=new Set();
   document.getElementById('ahrefs-loaded-bar').classList.remove('show');
   document.getElementById('ahrefs-upload-area').style.display='';
   document.getElementById('ahrefs-file-input').value='';
@@ -1618,10 +1640,10 @@ function renderBlockC(){
   countEl.textContent=`${checked} / ${blockCDomains.length} domen`;
   countEl.className=checked>0?'ph-count':'ph-count ph-count-zero';
 
-  // Apply TLD filter
-  const visible = blockCTldFilter==='all'
+  // Apply TLD filter (multi-select — pusty Set = brak filtra)
+  const visible = blockCTldFilter.size === 0
     ? blockCDomains
-    : blockCDomains.filter(d=>getTld(d.entry)===blockCTldFilter);
+    : blockCDomains.filter(d=>blockCTldFilter.has(getTld(d.entry)));
 
   items.innerHTML='';
   if(!visible.length){
@@ -1693,10 +1715,10 @@ async function loadClustericFile(file){
 
     blockDDomains=parsed;
     blockDQFilter='all';
-    blockDTldFilter='all';
+    blockDTldFilter=new Set();
 
-    buildTldFilter(blockDDomains,'blockD-tld-filter','blockD-tld-wrap', tld=>{
-      blockDTldFilter=tld; renderBlockD();
+    buildTldFilter(blockDDomains,'blockD-tld-filter','blockD-tld-wrap', active=>{
+      blockDTldFilter=active; renderBlockD();
     });
     renderBlockD();
     updatePreview();
@@ -1739,7 +1761,7 @@ function setBlockDQFilter(value, btn){
 function clearClusteric(){
   blockDDomains=[];
   blockDQFilter='all';
-  blockDTldFilter='all';
+  blockDTldFilter=new Set();
   document.getElementById('clusteric-loaded-bar').classList.remove('show');
   document.getElementById('clusteric-upload-area').style.display='';
   document.getElementById('clusteric-file-input').value='';
@@ -1767,10 +1789,10 @@ function renderBlockD(){
   countEl.textContent=`${checked} / ${blockDDomains.length} domen`;
   countEl.className=checked>0?'ph-count':'ph-count ph-count-zero';
 
-  // Apply quality filter then TLD filter
+  // Apply quality filter then TLD filter (multi-select)
   let visible=blockDDomains;
   if(blockDQFilter!=='all') visible=visible.filter(d=>d.clusterStatus===blockDQFilter);
-  if(blockDTldFilter!=='all') visible=visible.filter(d=>getTld(d.entry)===blockDTldFilter);
+  if(blockDTldFilter.size>0) visible=visible.filter(d=>blockDTldFilter.has(getTld(d.entry)));
 
   items.innerHTML='';
   if(!visible.length){
